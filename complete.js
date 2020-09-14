@@ -4,7 +4,6 @@ const creds = require("./config.json");
 const o_debug = true;
 const chapterData = {};
 
-
 // https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#puppeteerlaunchoptions
 const puppetConfig = {
   product: "chrome",
@@ -20,9 +19,13 @@ const puppetConfigDebug = {
   ignoreHTTPSErrors: false,
   headless: false,
   executablePath: "",
-  slowMo: 0,
+  slowMo: 50,
   timeout: 30000,
 };
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 const log = (string) => {
   if (!string || !o_debug) return;
@@ -31,6 +34,28 @@ const log = (string) => {
   let time = now.toString().match(/(.+?)\sGMT/i)[1];
   console.log(`[${time}] - ${string}`);
 };
+
+async function waitForScopedSelector(selector, scopeElement, page) {
+  return await page.waitForFunction(
+    (selector, scopeElement) => scopeElement.querySelector(selector),
+    {},
+    selector,
+    scopeElement
+  );
+}
+
+async function findAndClickScopedSelector(selector, scopeElement, page) {
+  return await page.evaluate(
+    (selector, scopeElement) => scopeElement.querySelector(selector).click(),
+    {},
+    selector,
+    scopeElement
+  );
+}
+
+async function findAndClick() {
+
+}
 
 async function login(page) {
   log("Going to zyBooks login page.");
@@ -44,9 +69,6 @@ async function login(page) {
     delay: 0,
   });
   await page.waitForSelector("div.zybooks-container");
-  // log("Waiting 5 seconds for it to load.");
-  // await page.waitForTimeout(5000); // wait for 5 seconds to let it log you in
-  // log("Resuming...");
   return page;
 }
 
@@ -54,221 +76,139 @@ async function selectzyBook(page) {
   log("Navigating to course page (using the predefined course code)");
   await page.goto("https://learn.zybooks.com/zybook/" + creds.zybook);
   await page.waitForSelector("div.zybook-index-page");
-  // log("Waiting 5 seconds for it to load.");
-  // await page.waitForTimeout(5000); // wait for 5 seconds to let it load
-  // log("Resuming...");
   const chapters = await page.$$(".chapter-item");
   log(`There are ${chapters.length} chapters to choose from!`);
-  // await page.$$eval(".chapter-item", chapter => {
-  //   console.log("Chapter: " + chapter);
-  //   document.querySelector(chapter).querySelector("h3").click();
-  // });
   await page.evaluate(() => {
     document.querySelectorAll(".chapter-item h3").forEach((e) => {
       e.click();
     });
   });
-  // log("Waiting 9 seconds for everything to load.")
-  // await page.waitForTimeout(9000);
-  await chapters.forEach(async (e, idx) => {
-    ////// Failed to get hrefs so chapter links
-    // await page.evaluate(chapter => chapter.click(), e);
-    // // await e.click();
-    // log("Waiting 3 seconds for it to load.");
-    // await page.waitForTimeout(3000);
-    // log("Resuming...");
-    // // console.log(idx, " - ", e);
-    // await e.click();
-    // await page.waitForSelector(".chapter-item li");
+  for (const [idx, e] of chapters.entries()) {
     const sectionCount = (await e.$$("li")).length;
-    console.log("len: " + await sectionCount);
-
-    // If current section number is less than the sectionCount. click .nav-text.next
     let chapterNumber = `${idx + 1}`;
     chapterData[chapterNumber] = {};
     chapterData[chapterNumber]["sectionCount"] = await sectionCount;
     chapterData[chapterNumber][
       "startUrl"
     ] = `https://learn.zybooks.com/zybook/WISCCOMPSCI240MATH240HastiFall2020/chapter/${chapterNumber}/section/1`;
-    // console.log(await chapterData[chapterNumber]);
-    // if (chapters.length == idx + 1) {
-    //   console.log("WE ARE DONE WITH THIS THEN THE NEXT FUNCTION SHOULD BE CALLED NOW!");
-    //   return page;
-    // }
-  });
+  }
   return page;
 }
 
 async function playAnimations(page) {
-  const animation_players = page.$$(
+  const animation_players = await page.$$(
     "div.interactive-activity-container.animation-player-content-resource.participation.ember-view"
   );
-  animation_players.forEach(async (animation) => {
-    await page.click("div.section-header-row", {
-      button: "left",
-      clickCount: 1,
-      delay: 0,
-    });
-    const double_speed = animation.$("div.speed=control");
+  for (const animation of animation_players) {
+    const double_speed = await animation.$("div.speed-control");
     await double_speed.click({
       button: "left",
       clickCount: 1,
       delay: 0,
     });
-    const start_button = animation.$(
+    const start_button = await animation.$(
       "button.start-button.start-graphic.zb-button.primary.raised.ember-view"
     );
-    start_button.click({
+    await start_button.click({
       button: "left",
       clickCount: 1,
       delay: 0,
     });
-    while (true) {
-      if ([...animation.$$("div.pause-button")].length > 0) {
+    while ((await animation.$$("div.play-button.rotate-180")).length == 0) {
+      // Wait for it to finish
+      if (await animation.$("div.pause-button") != null) {
         continue;
       }
-      const play_button = animation.$("div.play-button.bounce");
-      if (play_button) {
+      const play_button = await animation.$("div.play-button.bounce");
+      if (await play_button) {
         await play_button.click({
           button: "left",
           clickCount: 1,
           delay: 0,
         });
       }
-      if ([...animation.$$("div.play-button.rotate-180")].length > 0) {
-        break;
-      }
     }
-    console.log("Completed animation activity");
-  });
+    log("Completed animation activity");
+  }
+  return;
 }
 
-/*
-
-def completeMatching(driver):
-	matching_sets = driver.find_elements_by_xpath("//div[@class='interactive-activity-container custom-content-resource participation large ember-view']")
-	matching_sets += driver.find_elements_by_xpath("//div[@class='interactive-activity-container custom-content-resource participation medium ember-view']")
-	matching_sets += driver.find_elements_by_xpath("//div[@class='interactive-activity-container custom-content-resource participation small ember-view']")
-	for matching in matching_sets:
-		driver.find_element_by_xpath("//div[@class='section-header-row']").click()
-		while(True):
-			try:
-				choice = matching.find_element_by_xpath(".//div[@class='js-draggableObject draggable-object ember-view']")
-				choice_text = matching.find_element_by_xpath(".//div[@class='js-draggableObject draggable-object ember-view']/div/span").text
-				choice.click()
-			except:
-				break
-			empty_bucket = matching.find_element_by_xpath(".//div[@class='definition-drag-container flex-row    draggable-object-target ember-view']")
-			empty_bucket_text = matching.find_element_by_xpath("./..//div[@class='definition']").text
-			empty_bucket.click()
-			action = ActionChains(driver)
-
-			#The following and all other drag and drop operations within the matching activity type fails to actually move an option into a bucket in Firefox
-			#The drag_and_drop() function itself works perfectly fine, but something about the zyBooks site prevents the releasing of an option into a bucket from registering
-			#My suspicion is that manually doing it triggers some javascript that opens the bucket for dropping, but selenium actions do not trigger that javascript
-			#I have tried every alternative method for performing the operation that I could possibly think of, but none work
-			action.drag_and_drop(choice, empty_bucket).perform() #the drag and drop operation in question
-			populated_buckets = matching.find_elements_by_xpath(".//div[@class='js-draggableObject draggable-object ember-view']")
-			current_bucket = None
-			for populated_bucket in populated_buckets:
-				if(populated_bucket.find_element_by_xpath("./../../div[@class='definition']").text == empty_bucket_text):
-					current_bucket = populated_bucket
-			if(current_bucket.find_elements_by_xpath("./../..//div[@class='explanation correct']")):
-				continue
-			remaining_empty_buckets = matching.find_elements_by_xpath(".//div[@class='term-bucket ']")
-			for bucket in remaining_empty_buckets:
-				populated_buckets = matching.find_elements_by_xpath(".//div[@class='js-draggableObject draggable-object ember-view']")
-				for populated_bucket in populated_buckets:
-					if(populated_bucket.text == choice_text):
-						choice = populated_bucket
-						break
-				ActionChains(driver).drag_and_drop(choice, bucket).perform()
-				bucket.click()
-				if(bucket.find_elements_by_xpath("./../..//div[@class='explanation correct']")):
-					break
-*/
-
 async function completeCustomInteractions(page) {
-  const custom_activties = page.$$(
+  const custom_activties = await page.$$(
     "div.interactive-activity-container.custom-content-resource.participation.ember-view"
   );
-  custom_activties.forEach(async (activity) => {
-    await page.click("div.section-header-row", {
-      button: "left",
-      clickCount: 1,
-      delay: 0,
-    });
-    const buttons = activity.$$("button.button");
-    buttons.forEach(async (button) => {
+  for (const activity of custom_activties) {
+    const buttons = await activity.$$("button.button");
+    for (const button of buttons) {
       await button.click({
         button: "left",
         clickCount: 1,
         delay: 0,
       });
-    });
-  });
+    }
+  }
+  return;
 }
 
 async function completeMultipleChoice(page) {
-  const multiple_choice_sets = page.$$(
+  const multiple_choice_sets = await page.$$(
     "div.interactive-activity-container.multiple-choice-content-resource.participation.ember-view"
   );
-  multiple_choice_sets.forEach(async (question_set) => {
-    await page.click("div.section-header-row", {
-      button: "left",
-      clickCount: 1,
-      delay: 0,
-    });
-    const questions = question_set.$$(
+  for (const question_set of multiple_choice_sets) {
+    const questions = await question_set.$$(
       "div.question-set-question.multiple-choice-question.ember-view"
     );
-    questions.forEach(async (question) => {
-      const choices = question.$$("label[aria-hidden='true']");
-      choices.forEach(async (choice) => {
+    for (const question of questions) {
+      const choices = await question.$$("label[aria-hidden='true']");
+      for (const choice of choices) {
+        if (await question.$("div.zb-explanation.has-explanation.correct") != null) {
+          return;
+        }
         await choice.click({
           button: "left",
           clickCount: 1,
           delay: 0,
         });
-        if (
-          [...question.$$("div.explanation.has-explanation.correct")].length > 0
-        ) {
-          break;
-        }
-      });
-    });
-    console.log("Completed multiple choice set");
-  });
+      }
+    }
+    log("Completed multiple choice set");
+  }
+  return;
 }
 
 async function completeShortAnswer(page) {
-  const short_answer_sets = page.$$(
+  const short_answer_sets = await page.$$(
     "div.interactive-activity-container.short-answer-content-resource.participation.ember-view"
   );
-  short_answer_sets.forEach(async (question_set) => {
-    await page.click("div.section-header-row", {
-      button: "left",
-      clickCount: 1,
-      delay: 0,
-    });
-    const questions = question_set.$$(
+  for (const question_set of short_answer_sets) {
+    const questions = await question_set.$$(
       "div.question-set-question.short-answer-question.ember-view"
     );
-    questions.forEach(async (question) => {
-      const show_answer_button = question.$(
+    for (const question of questions) {
+      const show_answer_button = await question.$(
         "button.show-answer-button.zb-button.secondary.ember-view"
       );
       await show_answer_button.click({
         button: "left",
-        clickCount: 2,
-        delay: 500,
+        clickCount: 1,
+        delay: 0,
       });
-      const answer = question.$("span.forfeit-answer").innerText;
-      const text_area = question.$(
+      await show_answer_button.click({
+        button: "left",
+        clickCount: 1,
+        delay: 0,
+      });
+      await waitForScopedSelector("span.forfeit-answer", question, page);
+      const answer = await question.$eval(
+        "span.forfeit-answer",
+        (answer) => answer.innerText
+      );
+      //`${await question.$("span.forfeit-answer").innerText}`;
+      const text_area = await question.$(
         "textarea.zb-text-area.hide-scrollbar.ember-text-area.ember-view"
       );
       await text_area.type(answer, { delay: 25 });
-      const check_button = question.$(
+      const check_button = await question.$(
         "button.check-button.zb-button.primary.raised.ember-view"
       );
       await check_button.click({
@@ -276,53 +216,49 @@ async function completeShortAnswer(page) {
         clickCount: 1,
         delay: 0,
       });
-    });
-    console.log("Complete short answer set");
-  });
+    }
+    log("Complete short answer set");
+  }
+  return;
 }
 
 async function completeSelectionProblems(page) {
-  const selection_problem_sets = page.$$(
+  const selection_problem_sets = await page.$$(
     "div.interactive-activity-container.detect-answer-content-resource.participation.ember-view"
   );
-  selection_problem_sets.forEach(async (question_set) => {
-    await page.click("div.section-header-row", {
-      button: "left",
-      clickCount: 1,
-      delay: 0,
-    });
-    const questions = question_set.$$(
+  for (const question_set of selection_problem_sets) {
+    const questions = await question_set.$$(
       "div.question-set-question.detect-answer-question.ember-view"
     );
-    questions.forEach(async (question) => {
-      const choices = question.$$("div.unclicked");
-      choices.forEach(async (choice) => {
+    for (const question of questions) {
+      const choices = await question.$$("div.unclicked");
+      for (const choice of choices) {
+        if (await question.$$("div.explanation.has-explanation.correct") != null) {
+          return;
+        }
         await choice.click({
           button: "left",
           clickCount: 1,
           delay: 0,
         });
-        if (
-          [...question.$$("div.explanation.has-explanation.correct")].length > 0
-        ) {
-          break;
-        }
-      });
-    });
-    console.log("Completed selection problem set");
-  });
+      }
+    }
+  }
+  log("Completed selection problem set");
+  return;
 }
 
 async function completeProgressionChallenges(page) {
-  const progression_challenges = page.$$(
+  const progression_challenges = await page.$$(
     "div.interactive-activity-container.custom-content-resource.challenge.ember-view"
   );
-  progression_challenges.forEach((progression) => {
-    let progression_status = progression.$$(
+  for (const progression of progression_challenges) {
+    let progression_status = await progression.$$(
       "div.zyante-progression-status-bar > div"
     );
-    progression_status.forEach(async (status) => {
-      if (status.innerText.includes("1")) {
+    for (const status of progression_status) {
+      // if (await status.innerText.includes("1")) {
+      if (await status.evaluate((node) => node.innerText.includes("1"))) {
         // start_button = progression.$("button.zyante-progression-start-button.button")
         await page.click("button.zyante-progression-start-button.button", {
           button: "left",
@@ -337,32 +273,67 @@ async function completeProgressionChallenges(page) {
           delay: 0,
         });
       }
-    });
-  });
+    }
+  }
   return;
 }
 
 async function completeParticipationActivities(page) {
-  await playAnimations(page);
+  log("Running playAnimations");
+  await playAnimations(page).catch((err) => console.error("\t\t\t" + err));
+  log("Running completeCustomInteractions");
   await completeCustomInteractions(page);
+  log("Running completeMultipleChoice");
   await completeMultipleChoice(page);
+  log("Running completeShortAnswer");
   await completeShortAnswer(page);
+  // log("Running completeMatching")
   // await completeMatching(page);
+  log("Running completeSelectionProblems");
   await completeSelectionProblems(page);
-  return;
 }
 
 async function completeChapters(page) {
-  creds.chaptersToComplete.forEach(async (chapterNumber) => {
+  // creds.chaptersToComplete.forEach(async (chapterNumber) => {
+  for (const [idx, chapterNumber] of creds.chaptersToComplete.entries()) {
     await page.goto(chapterData[chapterNumber].startUrl);
-    for (let i = 1; i < chapterData[chapterNumber]["sectionCount"]; i++) {
+    await page.waitForSelector("div.zybook-chapter-section-page");
+    await page.waitForSelector(".zybook-section.zb-card.ember-view");
+    // for (let i = 1; i < chapterData[chapterNumber]["sectionCount"]; i++) {
+    // for await (const sectionCount of chapterData[chapterNumber][
+    //   "sectionCount"
+    // ]) {
+    // for (let i = 1; i < chapterData[chapterNumber]["sectionCount"]; i++) {
+    //// https://stackoverflow.com/questions/8069315/create-array-of-all-integers-between-two-numbers-inclusive-in-javascript-jquer
+    for (const i of Array.from(
+      { length: chapterData[chapterNumber]["sectionCount"] - 1 },
+      (v, k) => k + 1
+    )) {
+      // await (async () => {
       await completeParticipationActivities(page);
-      await page.click("span.nav-test.next");
+      // TODO: Add a check to see when the loading is done on activity completion
+      log("Sleeping for 5 seconds to let the page finish doing its thang!");
+      await sleep(5000);
+      if ((await page.$("span.nav-test.next")) != null) {
+        await page.click("span.nav-test.next");
+      } else {
+        await page.goto(
+          chapterData[chapterNumber].startUrl.replace(
+            /section\/\d+/,
+            "section/" + (i + 1)
+          )
+        );
+      }
       await page.waitForSelector(".zybook-section.zb-card.ember-view");
+      await page.waitForSelector("div.zybook-chapter-section-page");
+      // })();
     }
-  });
+  }
+  return;
 }
 
+
+// Main Function
 (async () => {
   const browser = await puppeteer.launch(puppetConfigDebug);
   const page = await browser.newPage();
@@ -371,10 +342,16 @@ async function completeChapters(page) {
     height: 1080,
     deviceScaleFactor: 1,
   });
+  page.on("dialog", async (dialog) => {
+    log("dialog found");
+    await dialog.accept();
+  });
   try {
-    await login(page).catch(err => console.log("ERROR!!11!111!! " + err));
-    await selectzyBook(page).catch(err => console.log("ERROR!!!!! " + err));
-    await completeChapters(page).catch(err=>{console.log("ERROR!!!!!22222 " + err)});
+    await login(page).catch((err) => console.log("ERROR!!11!111!! " + err));
+    await selectzyBook(page).catch((err) => console.log("ERROR!!!!! " + err));
+    await completeChapters(page).catch((err) => {
+      console.log("ERROR!!!!!22222 " + err);
+    });
   } catch (err) {
     console.error(err);
   }
