@@ -101,9 +101,14 @@ async function selectzyBook(page) {
 }
 
 async function playAnimations(page) {
+  console.log("playAnimations??");
   const animation_players = await page.$$(
     "div.interactive-activity-container.animation-player-content-resource.participation.ember-view"
   );
+  if (animation_players.length == 0) {
+    log(`\t\tNo playAnimations to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const animation of animation_players) {
     if (activityAlreadyCompleted(animation)) return;
     const double_speed = await animation.$("div.speed-control");
@@ -136,13 +141,16 @@ async function playAnimations(page) {
     }
     log("COMPLETED: animation activity");
   }
-  return;
 }
 
 async function completeCustomInteractions(page) {
   const custom_activties = await page.$$(
     "div.interactive-activity-container.custom-content-resource.participation.ember-view"
   );
+  if (custom_activties.length == 0) {
+    log(`\t\tNo completeCustomInteractions to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const activity of custom_activties) {
     if (activityAlreadyCompleted(activity)) return;
     const buttons = await activity.$$("button.button");
@@ -154,13 +162,16 @@ async function completeCustomInteractions(page) {
       });
     }
   }
-  return;
 }
 
 async function completeMultipleChoice(page) {
   const multiple_choice_sets = await page.$$(
     "div.interactive-activity-container.multiple-choice-content-resource.participation.ember-view"
   );
+  if (multiple_choice_sets.length == 0) {
+    log(`\t\tNo completeMultipleChoice to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const question_set of multiple_choice_sets) {
     if (activityAlreadyCompleted(question_set)) return;
     const questions = await question_set.$$(
@@ -186,13 +197,16 @@ async function completeMultipleChoice(page) {
     }
     log("COMPLETED: multiple choice set");
   }
-  return;
 }
 
 async function completeShortAnswer(page) {
   const short_answer_sets = await page.$$(
     "div.interactive-activity-container.short-answer-content-resource.participation.ember-view"
   );
+  if (short_answer_sets.length == 0) {
+    log(`\t\tNo completeShortAnswer to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const question_set of short_answer_sets) {
     if (activityAlreadyCompleted(question_set)) return;
     const questions = await question_set.$$(
@@ -233,13 +247,16 @@ async function completeShortAnswer(page) {
     }
     log("COMPLETED: short answer set");
   }
-  return;
 }
 
 async function completeSelectionProblems(page) {
   const selection_problem_sets = await page.$$(
     "div.interactive-activity-container.detect-answer-content-resource.participation.ember-view"
   );
+  if (selection_problem_sets.length == 0) {
+    log(`\t\tNo completeSelectionProblems to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const question_set of selection_problem_sets) {
     if (activityAlreadyCompleted(question_set)) return;
     const questions = await question_set.$$(
@@ -262,13 +279,16 @@ async function completeSelectionProblems(page) {
     }
     log("COMPLETED: selection problem set");
   }
-  return;
 }
 
 async function completeProgressionChallenges(page) {
   const progression_challenges = await page.$$(
     "div.interactive-activity-container.custom-content-resource.challenge.ember-view"
   );
+  if (progression_challenges.length == 0) {
+    log(`\t\tNo completeProgressionChallenges to do...`);
+    return new Promise((res,rej)=>{res()});
+  }
   for (const progression of progression_challenges) {
     if (activityAlreadyCompleted(progression)) return;
     let progression_status = await progression.$$(
@@ -293,7 +313,6 @@ async function completeProgressionChallenges(page) {
       }
     }
   }
-  return;
 }
 
 async function completeParticipationActivities(page) {
@@ -415,7 +434,8 @@ async function completeChapters(page) {
 
       // If on the last section for this chapter => return;
       if (i >= chapterData[chapterNumber]["sectionCount"]) {
-        log(`Skipping Section ${i}`);
+        // log(`Skipping Section ${i+1}`);
+        // log(`Moving to the next chapter --> Chapter ${chapterNumber+1}`);
         return;
       }
       if ((await page.$("span.nav-test.next")) != null) {
@@ -443,10 +463,14 @@ async function completeChapters(page) {
 
 async function writeMissedSections() {
   const data = {};
-  [...Object.keys(chapterData)].forEach((chapter) => {
-    const { misses } = chapter;
-    data[`Chapter ${chapter}`] = misses;
-  });
+  // [...Object.keys(chapterData)].forEach((chapter) => {
+  for (const chapter of [...Object.keys(chapterData)]) {
+    await (async () => {
+      const { misses } = chapter;
+      data[`Chapter ${chapter}`] = misses;
+    })();
+    // });
+  }
   writeFile("missedActivities.json", JSON.stringify(data), () =>
     log("Wrote 'missedActivities.json' file")
   );
@@ -473,7 +497,7 @@ async function writeMissedSections() {
     await completeChapters(page).catch((err) => {
       console.log("completeChapters ERROR: " + err);
     });
-    // await writeMissedSections();
+    await writeMissedSections();
   } catch (err) {
     console.error(err);
   }
