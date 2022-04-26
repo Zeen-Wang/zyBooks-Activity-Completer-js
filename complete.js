@@ -1,14 +1,15 @@
 const puppeteer = require("puppeteer");
-// const puppeteer = require('puppeteer-core'); // Use if you want to use pre-installed chrome
+//const puppeteer = require('puppeteer-core'); // Use if you want to use pre-installed chrome
 const creds = require("./config.json");
 const { writeFile } = require("fs");
 
+//fixed bugs
 // https://github.com/puppeteer/puppeteer/blob/main/docs/api.md#puppeteerlaunchoptions
 const puppetConfig = {
   product: "chrome",
   ignoreHTTPSErros: false,
   headless: true,
-  executablePath: "", // Add user's chrome path ("/path/to/Chrome")
+  executablePath: "/Applications/Google Chrome.app", // Add user's chrome path ("/path/to/Chrome")
   slowMo: 0,
   timeout: 60000, // 60 seconds
 };
