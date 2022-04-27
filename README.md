@@ -3,7 +3,7 @@ zyBooks Completer written in Nodejs with Puppeteer for website automation.
 
 ## Setup
 1. Install [NodeJs](https://nodejs.org/en/download/current/ "NodeJs")
-2. git clone https://github.com/andyvuj24/zyBooks-Activity-Completer-js.git
+2. git clone https://github.com/Zeen-Wang/zyBooks-Activity-Completer-js.git
 3. npm install
 
 	a. If you want to use a pre-installed version of chrome do "npm install puppeteer-core"
@@ -17,10 +17,10 @@ zyBooks Completer written in Nodejs with Puppeteer for website automation.
 	b. Specify exact zyBook name
 ```javascript
 {
-"email": "git@github.com",
-"pass": "github",
-"zybook": "EXAMPLECS555CODINGCLASSSUMMER2020",
-"chaptersToComplete": [1, 2, 4, 9]
+	"email": "yourid@rose-hulman.edu",
+	"pass": "put your password",
+	"zybook": "ROSEHULMANCSSE280Spring2022",
+	"chaptersToComplete": [3, 4, 8, 10, 12, 13]
 }
 ```
 
