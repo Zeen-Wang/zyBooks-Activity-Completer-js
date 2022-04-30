@@ -9,7 +9,7 @@ const puppetConfig = {
   product: "chrome",
   ignoreHTTPSErros: false,
   headless: true,
-  executablePath: "/Applications/Google Chrome.app", // Add user's chrome path ("/path/to/Chrome")
+  executablePath: "C:\Program Files\Google\Chrome\Application\chrome.exe", // Add user's chrome path ("/path/to/Chrome")
   slowMo: 0,
   timeout: 60000, // 60 seconds
 };
@@ -47,7 +47,7 @@ const logDebug = (str) => {
 };
 
 const _click = async (element) => {
-  element?.click();
+  element.click();
 };
 
 /**
